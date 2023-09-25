@@ -1,0 +1,491 @@
+<head>
+    <title>Assignment7</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <br>
+    <canvas id="myCanvas" style="border:1px solid #000000;" width="1000" height="650"></canvas>
+    <script type="text/javascript">
+
+
+        /****************
+         * SPRITE CLASS *
+         ****************/
+
+        function Sprite(x, y, image_urls, update_method, onclick_method) {
+            this.x = x;
+            this.y = y;
+            this.lastx = x;
+            this.lasty = y;
+            this.image = new Image();
+            this.image.src = "images/" + image_urls[0];
+            this.update = update_method;
+            this.onclick = onclick_method;
+            this.image_urls = image_urls;
+
+            // mario stuff
+            this.vert_vel = 0;
+            this.counter = 0;
+            this.freeze = false;
+            this.obstacle = null;
+            this.imagenum = 0;
+            this.dir = 1;
+
+
+            // coin block stuff stuff
+            this.coinCount = 5;
+            this.dir = -1;
+
+            // coin stuff
+            this.hvelocity = Math.floor(Math.random() * 20) - 10;
+            this.vvelocity = 5;
+
+        }
+
+        // set destination
+        Sprite.prototype.set_destination = function (x, y) {
+            this.dest_x = x;
+            this.dest_y = y;
+        }
+
+        // ignore click
+        Sprite.prototype.ignore_click = function (x, y) {
+        }
+
+        // move sprite
+        Sprite.prototype.move = function (dx, dy) {
+            this.lastx = this.x;
+            this.lasty = this.y;
+            this.x = this.x + dx;
+            this.y = this.y + dy;
+        }
+
+        // back one move
+        Sprite.prototype.back = function () {
+            this.x = this.lastx;
+            this.y = this.lasty;
+        }
+
+        // go to destination
+        Sprite.prototype.go_toward_destination = function () {
+            if (this.dest_x === undefined)
+                return;
+
+            if (this.x < this.dest_x)
+                this.x++;
+            else if (this.x > this.dest_x)
+                this.x--;
+            if (this.y < this.dest_y)
+                this.y++;
+            else if (this.y > this.dest_y)
+                this.y--;
+        }
+
+        // no move ment
+        Sprite.prototype.sit_still = function () {
+        }
+
+        // move coin block
+        Sprite.prototype.move_block = function () {
+
+            // move block
+            this.x += 5 * this.dir;
+
+        }
+
+
+        // move coin
+        Sprite.prototype.move_coin = function () {
+            // move coin
+            this.x += this.hvelocity;
+            this.y += this.vvelocity;
+
+
+
+        }
+
+        // a method to detect if this sprite collidses with another sprite
+        // x2,y2,width2 and height2 are the dimensions of the second sprite
+        // Return true if the two sprites collide
+        Sprite.prototype.hasCollided = function (x2, y2, width2, height2) {
+
+            // a.right_side < b.left_side)
+            if (this.x + this.image.width < x2)
+                return false;
+
+            // if(a.left_side > b.right_side)
+            if (this.x > x2 + width2)
+                return false;
+
+            // if(a.bottom_side < b.top_side) // assumes bigger is downward
+            if (this.y + this.image.height < y2)
+                return false;
+
+            // if(a.top_side > b.bottom_side) // assumes bigger is downward
+            if (this.y > y2 + height2)
+                return false;
+
+            return true;
+        }
+
+
+        // update mario
+        Sprite.prototype.jump = function () {
+            if (!this.freeze) {
+
+                this.vert_vel += 1.2;
+                this.y += this.vert_vel;
+
+                // Make the ground stop Mario from falling. Example code:
+                if (this.y > 500) {
+                    this.vert_vel = 0.0;
+                    this.y = 500; // snap back to the ground
+                }
+
+                // jump counter
+                if (this.y == 500)
+                    this.counter = 0;
+                else
+                    this.counter++;
+            }
+
+        }
+
+
+        // mario can go down
+        Sprite.prototype.canGoDown = function (obstacle) {
+            // a.right_side < b.left_side)
+            if (this.x + this.image.width < obstacle.x)
+                return true;
+
+            // if(a.left_side > b.right_side)
+            if (this.x > obstacle.x + obstacle.image.width)
+                return true;
+
+            return false;
+
+        }
+
+        /****************
+         * MODEL CLASS *
+         ****************/
+
+        // updated sprites positions
+
+        function Model() {
+            this.sprites = [];
+            this.blocks = [];
+
+
+            // function Sprite(x, y, image_url, update_method, onclick_method
+            this.mario = new Sprite(500, 500, ["mario1.png", "mario2.png", "mario3.png", "mario4.png", "mario5.png"],
+                   Sprite.prototype.jump, Sprite.prototype.ignore_click);
+            this.sprites.push(this.mario);
+
+            // make coin block
+            var block = new Sprite(900, 300, ["coinblock.png"], Sprite.prototype.move_block, Sprite.prototype.ignore_click);
+            this.blocks.push(block);
+            this.sprites.push(block);
+
+            var brick = new Sprite(900, 300, ["brick.png"], Sprite.prototype.sit_still, Sprite.prototype.ignore_click);
+            this.sprites.push(brick);
+
+            this.scrollpos = 0;
+            this.bricktime = 0;
+            this.blocktime = 0;
+
+        }
+
+        // update all sprites
+        Model.prototype.update = function () {
+            // for each sprite
+            for (let i = 0; i < this.sprites.length; i++) {
+                this.sprites[i].update();
+            }
+
+            // clear any coins
+            // remove coin if at end of screen
+
+            // remove coin from sprites
+            for (let k = this.sprites.length - 1; k >= 0; k--) {
+                if (this.sprites[k].y > View.SCREEN_HEIGHT) {
+                    this.sprites.splice(k, 1);
+                }
+            }
+
+
+
+            // change direction of coin block
+            for(let k=0;k<this.blocks.length;k++)
+            {
+                if(this.blocks[k].x < this.mario.x-500 || this.blocks[k].x > this.mario.x+500)
+                {
+                    this.blocks[k].dir = -this.blocks[k].dir;
+                }
+            }
+        }
+
+        // clicked on sprite
+        Model.prototype.onclick = function (x, y) {
+            for (let i = 0; i < this.sprites.length; i++) {
+                this.sprites[i].onclick(x, y);
+            }
+        }
+
+        // move relative
+        Model.prototype.move = function (dx, dy) {
+
+            // move mario
+            if (this.mario.freeze) {
+                if (this.mario.canGoDown(this.mario.obstacle)) {
+                    this.mario.freeze = false;
+                    this.mario.obstacle = null;
+                }
+            }
+
+
+
+            // move mario
+            let obstacle = this.canMove(this.mario, dx, dy);
+
+            if (obstacle == null) {
+                this.mario.move(dx, dy);
+
+                // cycle mario images
+
+                // forward
+                if (dx > 0) {
+                    this.mario.imagenum = (this.mario.imagenum + 1) % this.mario.image_urls.length;
+                    this.mario.image.src = "images/" + this.mario.image_urls[this.mario.imagenum];
+                    this.scrollpos += 5;
+                    this.bricktime++;
+
+                }
+
+                // backward
+                if (dx < 0) {
+                    this.mario.imagenum = ((this.mario.imagenum - 1) + this.mario.image_urls.length) % this.mario.image_urls.length;
+                    this.mario.image.src = "images/" + this.mario.image_urls[this.mario.imagenum];
+                    this.scrollpos -= 5;
+
+                }
+            }
+
+                // mario cannot move
+            else {
+
+                this.mario.freeze = true;
+                this.mario.obstacle = obstacle;
+                this.mario.back();
+
+
+
+                // check if mario hits a coin block
+                var foundblock = null;
+
+                for (let j = 0; j < this.blocks.length; j++) {
+                    let block = this.blocks[j];
+
+                    if (obstacle == block) {
+
+                
+                        foundblock = block;
+                        this.mario.freeze = false;
+
+                        // this brick has coins
+                        if (block.coinCount > 0) {
+
+                            // make new coin
+                            // function Sprite(x, y, image_url, update_method, onclick_method
+                            var coin = new Sprite(this.mario.x, this.mario.y, ["coin.png"], Sprite.prototype.move_coin, Sprite.prototype.ignore_click);
+                            this.sprites.push(coin);
+
+                            block.coinCount--; // count coins
+
+                        }
+                    }
+
+                }
+            }
+
+
+        // need a new block
+        if(foundblock != null && foundblock.coinCount==0){
+
+            var block = new Sprite(this.mario.x + 500, 300, ["coinblock.png"], Sprite.prototype.move_block, Sprite.prototype.ignore_click);
+            this.sprites.push(block);
+            this.blocks.push(block);                    
+
+        }
+
+
+            // time to make another  brick
+            if (this.bricktime >= 150) {
+                this.bricktime = 0;
+
+                var brick = new Sprite(this.mario.x + 500, Math.floor(Math.random() * 300 + 100), ["brick.png"], Sprite.prototype.sit_still, Sprite.prototype.ignore_click);
+                this.sprites.push(brick);
+
+            }
+
+        }
+
+        // return true if mario can move
+        Model.prototype.canMove = function (s1, dx, dy) {
+
+            // check for collission
+            for (let i = 0; i < this.sprites.length; i++) {
+
+                let s2 = this.sprites[i];
+
+                if (s2 != s1 && s1.hasCollided(s2.x - dx, s2.y + dy, s2.image.width, s2.image.height)) {
+
+                    return s2;
+                }
+            }
+
+            return null;
+        }
+
+
+
+        /**************
+         * VIEW CLASS *
+         **************/
+
+        // draws images
+
+        // construct view
+        function View(model) {
+            this.model = model;
+            this.canvas = document.getElementById("myCanvas");
+            this.background = new Image();
+            this.background.src = "images/" + "background.png";
+            this.xpos = 0;
+
+        }
+
+        // draw images
+        View.prototype.update = function () {
+
+            let ctx = this.canvas.getContext("2d");
+            ctx.clearRect(0, 0, 1000, 650);
+
+            // draw background image
+            this.xpos -= 1;
+            if (this.xpos == -1000)
+                this.xpos = 0;
+            ctx.drawImage(this.background, this.xpos, 0, 1000 * 2, 650);
+
+
+
+            // draw sprite images
+            for (let i = 0; i < this.model.sprites.length; i++) {
+                let sprite = this.model.sprites[i];
+                ctx.drawImage(sprite.image, sprite.x - this.model.scrollpos, sprite.y);
+            }
+
+            // draw ground
+            ctx.moveTo(0, 620);
+            ctx.lineTo(1000, 620);
+            ctx.lineWidth = 50;
+
+            // set line color
+            ctx.strokeStyle = '#00FF00';
+            ctx.stroke();
+
+        }
+
+
+        /********************
+         * CONTROLLER CLASS *
+         ********************/
+
+
+        function Controller(model, view) {
+            this.model = model;
+            this.view = view;
+            this.key_spacebar = false;
+            this.key_right = false;
+            this.key_left = false;
+            this.key_up = false;
+            this.key_down = false;
+            this.key_ctrl = false;
+            let self = this;
+            view.canvas.addEventListener("click", function (event) { self.onClick(event); });
+            document.addEventListener('keydown', function (event) { self.keyDown(event); }, false);
+            document.addEventListener('keyup', function (event) { self.keyUp(event); }, false);
+        }
+
+        Controller.prototype.onClick = function (event) {
+            this.model.onclick(event.pageX - this.view.canvas.offsetLeft, event.pageY - this.view.canvas.offsetTop);
+        }
+
+
+
+        Controller.prototype.keyDown = function (event) {
+            // space bar
+            if (event.keyCode == 32) {
+                this.key_spacebar = true;
+                this.model.mario.vert_vel -= 3;
+            }
+
+
+
+            else if (event.keyCode == 39) this.key_right = true;
+            else if (event.keyCode == 37) this.key_left = true;
+            else if (event.keyCode == 38) this.key_up = true;
+            else if (event.keyCode == 40) this.key_down = true;
+        }
+
+        Controller.prototype.keyUp = function (event) {
+            if (event.keyCode == 32) this.key_spacebar = false;
+            else if (event.keyCode == 17) this.key_ctrl = false;
+            else if (event.keyCode == 39) this.key_right = false;
+            else if (event.keyCode == 37) this.key_left = false;
+            else if (event.keyCode == 38) this.key_up = false;
+            else if (event.keyCode == 40) this.key_down = false;
+        }
+
+        // update key
+        Controller.prototype.update = function () {
+            let dx = 0;
+            let dy = 0;
+            if (this.key_right) dx += 5;
+            if (this.key_left) dx -= 5;
+            if (this.key_up) dy -= 5;
+            if (this.key_down) dy += 5;
+            //if(dx != 0 || dy != 0)
+            this.model.move(dx, dy);
+        }
+
+
+        /***************
+         *  GAME CLASS *
+         ***************/
+
+        // make game
+        function Game() {
+            this.model = new Model();
+            this.view = new View(this.model);
+            this.controller = new Controller(this.model, this.view);
+        }
+
+        // update timer
+        Game.prototype.onTimer = function () {
+            this.controller.update();
+            this.model.update();
+            this.view.update();
+        }
+
+        /********
+         * MAIN *
+         ********/
+
+        // make game
+        let game = new Game();
+        let timer = setInterval(function () { game.onTimer(); }, 40);
+
+    </script>
+
+</body>
