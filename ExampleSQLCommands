@@ -1,0 +1,166 @@
+create database tea_shop;
+
+use tea_shop;
+
+create table SUPPLIER 
+(ID int primary key,
+NAME varchar(50) not NULL,
+PHONE varchar(25) not NULL,
+EMAIL varchar(50) not NULL
+);
+
+ Insert into SUPPLIER  Values 
+(1,   'Coco Fresh Tea & Juice',    '7183532709',  'marketing@cocobubbletea.com'),
+(3,   'Sharetea',                  '4052122339',  'service@1992sharetea.com'),
+(4,   'Boba Guys',                 '4159672622',  'support@bobaguys.zendesk.com'),
+(8,   'Kung Fu Tea',               '8555389888',  'info@kfteausa.com'),
+(15,  'Fat Straws',                '4695472195',  'smile@fatstraws.net')
+;
+
+
+create table ITEM 
+(ID int primary key,
+NAME varchar(50) not NULL,
+SUPPLIER_ID int not NULL,
+QUANTITY int unsigned,
+UNIT_PRICE float not NULL
+);
+
+Insert into ITEM Values
+(2,   'Classic Black Tea',         3,   68,    3.00),
+(3,   'Classic Oolong Tea',        3,   36,    3.00),
+(10,  'Honey Milk Tea',            1,   59,    4.50),
+(11,  'Kung Fu Milk Green Tea',    8,   5,     4.50),
+(15,  'Mango & Passion Fruit Tea', 3,   15,    5.00),
+(20,  'Matcha Milk Tea',           4,   1,     4.00),
+(21,  'Taro Milk Tea',             15,  3,     4.00)
+;
+
+
+
+
+create table EMPLOYEE 
+(ID int primary key,
+NAME varchar(50) not NULL,
+ROLE varchar(50) not NULL,
+PHONE varchar(25) not NULL,
+ADDRESS varchar(50) not NULL,
+START_DATE date not NULL
+);
+
+Insert into EMPLOYEE values
+(1,   'Alice Atkins',      'Manager',   '479-555-0171',    '4240 Arlington Ave, Jonesboro',   '2021-10-12'),
+(2,   'Albert Bullock',    'Cashier',   '479-555-0149',    '383 Rosebud Ave, Hatfield',       '2021-10-12'),
+(3,   'Juan Scott',        'Cashier',   '479-555-0152',    '5 Barrington Court, Little Rock', '2021-10-12'),
+(4,   'Christine Jarrett', 'Cashier',   '479-555-0110',    '1484 Mulberry Avenue, Conway',    '2021-10-12')
+;
+
+
+
+create table SALES
+(ID	int	Primary key,
+EMPLOYEE_ID	int	NOT NULL,
+GRATUITY float,
+TOTAL float not NULL,
+CREATE_AT date NOT NULL,
+UPDATED_AT date	
+);
+
+
+Insert into SALES values
+(1,   4,   NULL,      16.50,   '2022-01-17 14:01:24',   NULL),
+(2,   4,   NULL,      4.00,    '2022-01-17 14:15:06',   NULL),
+(3,   3,   NULL,      17.50,   '2022-01-17 15:12:40',   NULL),
+(4,   2,   NULL,      6.00,    '2022-01-17 16:47:11',   NULL),
+(5,   1,   NULL,      7.50,    '2022-01-17 16:58:00',   NULL),
+(6,   2,   NULL,      4.00,    '2022-01-17 17:03:33',   NULL)
+;
+
+
+create table SALE_ITEMS
+(SALE_ID	int,
+ITEM_ID	int,
+QUANTITY	int,
+TOTAL	float,
+CHECK(QUANTITY >= 1),
+CHECK(TOTAL >=0),
+FOREIGN KEY (SALE_ID) REFERENCES SALES(ID) ON DELETE CASCADE,
+FOREIGN KEY (ITEM_ID) REFERENCES ITEM(ID) ON DELETE CASCADE,
+PRIMARY KEY (SALE_ID, ITEM_ID) 
+);
+
+Insert into SALE_ITEMS values
+(1,   20,    2,   8.00),
+(1,   21,    1,   4.00),
+(1,   11,    1,   4.50),
+(2,   20,    1,   4.00), 
+(3,   20,    1,   4.00),
+(3,   21,    1,   4.00),
+(3,   10,    1,   4.50),
+(3,   15,    1,   5.00),
+(4,   2,     1,   3.00),
+(4,   3,     1,   3.00),
+(5,   3,     1,   3.00),
+(5,   10,    1,   4.50),
+(6,   20,    1,   4.00)
+;
+
+
+show tables;
+Describe  EMPLOYEE;
+Describe  ITEM;
+Describe  SALE_ITEMS;
+Describe  SALES;
+Describe  SUPPLIER;
+
+
+SELECT COLUMN_NAME, CONSTRAINT_NAME, REFERENCED_COLUMN_NAME, REFERENCED_TABLE_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+WHERE REFERENCED_COLUMN_NAME IS NOT NULL AND CONSTRAINT_SCHEMA = 'tea_shop';
+
+
+Select I.NAME as Tea_Name, S.NAME as Supplier_Name from ITEM I, SUPPLIER S
+Where  I.SUPPLIER_ID=S.ID and  I.ID IN 
+(
+Select ITEM_ID from 
+                   (Select ITEM_ID, sum(QUANTITY) as total from SALE_ITEMS
+		Group by ITEM_ID order by total desc limit 1
+	       ) as max_demand
+);
+
+
+Update SALES 
+SET GRATUITY= 0.15*TOTAL, UPDATED_AT = CURDATE()
+where ID>0;
+
+Select Sum(Total)-Sum(Gratuity) as Total from SALES 
+Where CREATE_AT = '2022-01-17';
+
+
+
+(Select I.NAME, sum(SI.TOTAL) as total from SALE_ITEMS as SI , ITEM I
+Where I.ID = SI.ITEM_ID and  SI.SALE_ID  IN
+(SELECT s2.ID from SALES s2
+		Where MONTH(s2.CREATE_AT) = 2
+)
+Group by SI.ITEM_ID order by total desc limit 1
+);
+
+Select E.Name, sum(SI.QUANTITY) as COUNT from EMPLOYEE E , SALES S,  SALE_ITEMS SI
+Where E.ID = S.EMPLOYEE_ID and S.ID = SI.SALE_ID
+And SI.ITEM_ID 
+IN
+(Select id from ITEM
+Where NAME = "Taro Milk Tea")
+group by E.Name
+;
+
+Select E.Name, X.total_sales from EMPLOYEE E,
+
+(Select EMPLOYEE_ID as ID, sum(total) as total_sales from SALES
+Group by EMPLOYEE_ID 
+Order by total_sales DESC limit 1) as X
+
+Where E.ID=X.ID;
+
+
+
